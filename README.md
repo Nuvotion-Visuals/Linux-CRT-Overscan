@@ -94,3 +94,39 @@ removes the config and the autostart.
 - `-r` can only select a resolution the output already advertises. To use a mode
   the hardware does not expose, add it first with `cvt` and `xrandr --newmode`
   and `--addmode`.
+
+## Wayland
+
+This tool is X11 only. It is built entirely on `xrandr --transform`, and under
+Wayland `xrandr` talks only to XWayland, so it cannot affect the real output. It
+will silently do nothing on a Wayland session.
+
+There is also no drop in replacement, and the reason is worth understanding.
+
+- The affine transform this script depends on is not exposed by any compositor.
+  The Wayland output protocols define only 8 discrete transforms, the rotations
+  and flips. There is no protocol or config knob for an arbitrary scale plus
+  translate matrix anywhere in the ecosystem.
+- This is a missing feature, not a missing capability. Every Wayland compositor
+  is already a GPU compositor and applies transforms to surfaces every frame, so
+  shrinking and centering an output is trivial for it to do. Nobody exposes it
+  because the common cases, rotation and scaling, are already covered and CRT
+  overscan is niche.
+- It is this way by design. X had a single global server with a neutral config
+  surface that any tool could poke. Wayland removed that on purpose: the
+  compositor owns all output policy, and the protocols standardize only what is
+  common across compositors, so there is no neutral place to inject a transform.
+
+If you are on Wayland, the realistic routes to overscan compensation are:
+
+1. Push the shrink out of the display server, into the HDMI to component scaler
+   (most have a zoom or underscan control) or the TV service menu (horizontal and
+   vertical size). This is compositor independent and works everywhere, including
+   X, Wayland, and a bare console, with no script at all. Recommended.
+2. Use the amdgpu KMS underscan connector properties (`underscan`,
+   `underscan hborder`, `underscan vborder`), which shrink the scanout in
+   hardware below the display server. Compositor support for setting them varies:
+   KDE and KWin are the most likely to expose a built in overscan control, while
+   wlroots based compositors and GNOME generally do not. These borders are
+   symmetric, so they can shrink but cannot recenter an off center tube the way
+   the `-d` and `-e` offsets here can.
